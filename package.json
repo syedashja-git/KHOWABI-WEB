@@ -1,0 +1,30 @@
+{
+  "name": "khowabi-vercel-supabase",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node tests/enquiries.mjs"
+  },
+  "dependencies": {
+    "@types/nodemailer": "^8.0.2",
+    "lucide-react": "^1.31.0",
+    "next": "16.3.4",
+    "nodemailer": "^10.2.1",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,65 @@
+import ts from 'typescript';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+function moduleUrl(path, replacements={}) {
+ let source=fs.readFileSync(path,'utf8');
+ for(const [from,to] of Object.entries(replacements)) source=source.replaceAll(from,to);
+ return 'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText).toString('base64');
+}
+const db=moduleUrl('lib/supabase.ts');
+const email=moduleUrl('lib/enquiry-email.ts', {"'nodemailer'":JSON.stringify(import.meta.resolve('nodemailer'))});
+const {POST}=await import(moduleUrl('app/api/enquiries/route.ts',{'../../../lib/supabase':db,'../../../lib/enquiry-email':email}));
+const {GET}=await import(moduleUrl('app/admin/route.ts',{'../../lib/supabase':db}));
+const input={name:'Test Client',email:'client@example.com',phone:'03132244506',service:'Web Development',details:'Build a business website',company:'Test Company'};
+const request=(body=input,origin='https://example.com')=>new Request('https://example.com/api/enquiries',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
+assert.equal((await POST(request())).status,503);
+process.env.SUPABASE_URL='https://mock.supabase.co';process.env.SUPABASE_SECRET_KEY='sb_secret_test';
+assert.equal((await POST(request(input,'https://other.example'))).status,403);
+assert.equal((await POST(request({...input,email:'bad'}))).status,400);
+assert.equal((await POST(request(null))).status,400);
+assert.equal((await POST(request({...input,website:'bot'}))).status,400);
+let calls=[];
+globalThis.fetch=async(url,init)=>{calls.push({url,init});return new Response(null,{status:201})};
+const saved=await POST(request());assert.equal(saved.status,201);assert.equal((await saved.json()).emailSent,false);
+assert.equal(calls.length,1);assert.equal(JSON.parse(calls[0].init.body).name,input.name);
+assert.equal(calls[0].init.headers.apikey,'sb_secret_test');
+process.env.RESEND_API_KEY='mock';process.env.EMAIL_FROM='KHOWABI <hello@example.com>';
+calls=[];assert.equal((await (await POST(request())).json()).emailSent,true);
+assert.equal(calls.length,3);assert.equal(JSON.parse(calls[2].init.body).to[0],'infosyedashja@gmail.com');
+globalThis.fetch=async(url)=>{if(url.includes('resend.com'))throw Error('mock network error');return new Response(null,{status:201})};
+const mailFailure=await POST(request());assert.equal(mailFailure.status,201);assert.equal((await mailFailure.json()).emailSent,false);
+globalThis.fetch=async()=>new Response(null,{status:500});assert.equal((await POST(request())).status,503);
+assert.equal((await GET(new Request('https://example.com/admin'))).status,503);
+process.env.ADMIN_PASSWORD='a-test-password-at-least-16-characters';
+assert.equal((await GET(new Request('https://example.com/admin'))).status,401);
+globalThis.fetch=async()=>Response.json([{...input,id:'KHOWABI-TEST',name:'<script>alert(1)</script>'}]);
+const admin=await GET(new Request('https://example.com/admin',{headers:{authorization:'Basic '+Buffer.from('admin:'+process.env.ADMIN_PASSWORD).toString('base64')}}));
+assert.equal(admin.status,200);assert.ok((await admin.text()).includes('&lt;script&gt;'));
+console.log('PASS: validation, origin, configuration, Supabase persistence, two emails, provider failures, admin authentication and HTML escaping. Mock requests only.');
+
+// Gmail path: stub SMTP so tests never contact Google.
+const nodemailer=(await import('nodemailer')).default;
+const originalCreate=nodemailer.createTransport;
+let messages=[];let options;
+nodemailer.createTransport=(o)=>{options=o;return {sendMail:async(m)=>{messages.push(m);return {accepted:[m.to]}}}};
+const {sendEnquiryEmails}=await import(email);
+const enquiry={...input,id:'KHOWABI-GMAIL-TEST',budget:'Discuss',timeline:'Flexible'};
+const gmailConfig={GMAIL_USER:'infosyedashja@gmail.com',GMAIL_APP_PASSWORD:'abcd efgh ijkl mnop'};
+assert.deepEqual(await sendEnquiryEmails(enquiry,gmailConfig),{emailSent:true,notificationSent:true});
+assert.equal(options.port,465);assert.equal(options.secure,true);assert.equal(options.auth.pass,'abcdefghijklmnop');
+assert.equal(messages[0].from.address,gmailConfig.GMAIL_USER);
+assert.equal(messages[0].to,input.email);assert.equal(messages[1].to,gmailConfig.GMAIL_USER);
+assert.equal(messages[1].replyTo,input.email);
+nodemailer.createTransport=()=>({sendMail:async(m)=>{if(m.to===input.email)throw Object.assign(new Error('mock'),{code:'EAUTH',responseCode:535});return {accepted:[m.to]}}});
+assert.deepEqual(await sendEnquiryEmails(enquiry,gmailConfig),{emailSent:false,notificationSent:true});
+nodemailer.createTransport=originalCreate;
+console.log('PASS: Gmail SMTP configuration, recipients, reply-to, App Password normalization and independent failures. No real email sent.');
+
+const callsBeforeProvider=calls.length;
+assert.deepEqual(await sendEnquiryEmails(enquiry,{EMAIL_PROVIDER:'gmail'}),{emailSent:false,notificationSent:false});
+assert.deepEqual(await sendEnquiryEmails(enquiry,{EMAIL_PROVIDER:'invalid'}),{emailSent:false,notificationSent:false});
+let resendBodies=[];
+globalThis.fetch=async(_u,init)=>{resendBodies.push(JSON.parse(init.body));return Response.json({id:'mock'})};
+const domainResult=await sendEnquiryEmails(enquiry,{...gmailConfig,EMAIL_PROVIDER:'resend',RESEND_API_KEY:'mock',EMAIL_FROM:'KHOWABI <hello@khowabi.com>',SITE_URL:'https://khowabi.com',REPLY_TO_EMAIL:'owner@example.com'});
+assert.equal(domainResult.emailSent,true);assert.equal(resendBodies[0].reply_to,'owner@example.com');assert.ok(resendBodies[0].text.includes('https://khowabi.com'));assert.equal(resendBodies[0].from,'KHOWABI <hello@khowabi.com>');
+console.log('PASS: explicit email provider selection, custom-domain sender, reply-to and website footer.');
