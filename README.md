@@ -2,7 +2,17 @@
 
 Standard Next.js App Router website, prepared for GitHub and Vercel. Includes the existing responsive design, original project screenshots, hover cards, scroll drop animation, continuous ticker and WhatsApp link (+92 313 2244506).
 
-## 1. Create the Supabase database
+## Database option A (recommended): Cloudflare D1 — free, never pauses
+1. https://dash.cloudflare.com → **Storage & Databases → D1 SQL Database → Create** (name e.g. `khowabi-web`). Copy the **Database ID**.
+2. **Account home → ⋯ → Copy account ID** (32 characters).
+3. **My Profile → API Tokens → Create token → Start from scratch → Account policy → D1 → Edit** → Create, copy the token.
+4. In Vercel → Settings → Environment Variables add `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`, `CLOUDFLARE_API_TOKEN` (Production + Preview), then Redeploy.
+
+The `enquiries` table is created automatically on the first enquiry (`supabase/d1-schema.sql` is there if you want to run it yourself in the D1 Console). When the three D1 values are set, the site uses D1; otherwise it falls back to Supabase below. Existing Supabase enquiries are not copied automatically.
+
+## Database option B: Supabase
+
+### Create the Supabase database
 1. Create a project at https://supabase.com/dashboard and wait for it to become ready.
 2. Open **SQL Editor**, create a query, paste all of `supabase/schema.sql`, and Run.
 3. Copy your project URL from the project Connect/API settings.
