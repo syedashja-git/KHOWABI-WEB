@@ -38,3 +38,20 @@ footer .footer-brand img{width:240px;max-width:100%;height:auto;margin:-12px 0 0
 .reference strong{overflow-wrap:anywhere}
 @media(max-width:760px){.brand{width:170px;height:58px}.brand img{width:185px}.mini-nav{font-size:14px;gap:8px}}
 @media(max-width:380px){.brand{width:140px}.brand img{width:153px}}
+/* Project mockups carry their own device frames */
+.screen-frame{background:transparent;border:0;box-shadow:0 18px 40px #18372b2e;border-radius:12px}
+.screen-toolbar{display:none}
+.screen-frame img{height:auto!important;aspect-ratio:1400/650;object-fit:cover;border-radius:12px}
+/* Mobile polish */
+@media(max-width:760px){
+  .project-art{min-height:auto;padding:38px 12px 44px}
+  .project-art-bottom{left:16px;right:16px}
+  nav.open{gap:4px;padding:14px 6% 20px}
+  nav.open a{display:block;padding:12px 4px;font-size:17px;border-bottom:1px solid #edf2ef}
+  nav.open a:last-child{border-bottom:0}
+  .whatsapp{right:14px;bottom:14px;padding:12px;box-shadow:0 4px 16px #154f4240}
+  .whatsapp svg{width:22px;height:22px}
+}
+@media(max-width:380px){
+  .nav-cta{padding-left:12px;padding-right:12px;font-size:12px}
+}
